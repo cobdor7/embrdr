@@ -8,7 +8,7 @@ def load_contours(json_path):
         data = json.load(f)
     return data
 
-def generate_stitch_paths(contours_data, spacing=2.0, width=20):
+def generate_stitch_paths(contours_data, spacing=2.0, width=None):
     stitch_paths = []
 
     for entry in contours_data:
