@@ -1,8 +1,9 @@
-
 import argparse
 import json
 import matplotlib.pyplot as plt
 from satin_fill import generate_satin_fill
+from zigzag_fill import generate_zigzag_fill
+
 
 def fallback_running_stitch(contour, step=2.0):
     simplified = []
@@ -30,7 +31,7 @@ def load_contours(json_path):
         data = json.load(f)
     return data
 
-def generate_stitch_paths(contours_data, spacing=2.0, width=20, outline_step=2.0):
+def generate_stitch_paths(contours_data, spacing=2.0, width=20, outline_step=2.0, angle_deg=0):
     stitch_paths = []
 
     for entry in contours_data:
@@ -41,14 +42,14 @@ def generate_stitch_paths(contours_data, spacing=2.0, width=20, outline_step=2.0
 
             # Add fill
             try:
-                fill_lines = generate_satin_fill(contour, spacing=spacing, width=width)
+                fill_lines = generate_satin_fill(contour, spacing=spacing, width=width, angle_deg=angle_deg)
                 for x0, y0, x1, y1 in fill_lines:
                     stitch_paths.append((color, [(x0, y0), (x1, y1)]))
             except Exception as e:
-                print(f"Satin fill failed: {e} — fallback to running stitch")
-                fallback = fallback_running_stitch(contour, step=spacing)
-                for p0, p1 in fallback:
-                    stitch_paths.append((color, [p0, p1]))
+                print(f"Satin fill failed: {e} — fallback to zig-zag fill")
+                fallback = generate_zigzag_fill(contour, spacing=spacing)
+                for x0, y0, x1, y1 in fallback:
+                    stitch_paths.append((color, [(x0, y0), (x1, y1)]))
 
             # Add outline
             outline = fallback_running_stitch(contour, step=outline_step)
@@ -56,7 +57,6 @@ def generate_stitch_paths(contours_data, spacing=2.0, width=20, outline_step=2.0
                 stitch_paths.append((color, [p0, p1]))
 
     return stitch_paths
-
 
 def visualize_stitch_paths(stitch_paths, canvas_size=(128, 128)):
     plt.figure(figsize=(6, 6))
@@ -69,18 +69,25 @@ def visualize_stitch_paths(stitch_paths, canvas_size=(128, 128)):
         hex_color = "#{:02x}{:02x}{:02x}".format(*color)
         plt.plot(x, y, '-', color=hex_color, linewidth=1)
 
-    plt.title("Mixed Fill: Satin + Fallback Running Stitch")
+    plt.title("Mixed Fill: Satin + Zig-Zag + Outline")
     plt.show()
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("file", help="Path to contours JSON")
-    parser.add_argument("--spacing", type=float, default=2.0)
-    parser.add_argument("--width", type=float, default=20.0)
+    parser.add_argument("--spacing", type=float, default=2.0, help="Spacing between fill lines")
+    parser.add_argument("--width", type=float, default=20.0, help="Half-width of satin sweep")
+    parser.add_argument("--angle", type=float, default=0.0, help="Satin stitch angle in degrees")
     args = parser.parse_args()
 
     contour_data = load_contours(args.file)
-    stitch_paths = generate_stitch_paths(contour_data, spacing=args.spacing, width=args.width)
+    stitch_paths = generate_stitch_paths(
+        contour_data,
+        spacing=args.spacing,
+        width=args.width,
+        outline_step=args.spacing,
+        angle_deg=args.angle
+    )
     visualize_stitch_paths(stitch_paths)
 
 if __name__ == "__main__":
