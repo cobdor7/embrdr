@@ -1,2 +1,6 @@
 pyembroidery
 matplotlib
+pillow
+scikit-learn
+numpy
+opencv-python
