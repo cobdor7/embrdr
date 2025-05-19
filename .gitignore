@@ -1,2 +1,7 @@
 
 *.pyc
+output/contours.json
+output/output.pes
+output/reduced.png
+output/contours.json
+output/contours.json
