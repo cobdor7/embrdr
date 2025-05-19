@@ -1,6 +1,7 @@
 import argparse
 import json
 import matplotlib.pyplot as plt
+import numpy as np
 from satin_fill import generate_satin_fill
 from zigzag_fill import generate_zigzag_fill
 
@@ -25,12 +26,22 @@ def fallback_running_stitch(contour, step=2.0):
         return [(simplified[i], simplified[i + 1]) for i in range(len(simplified) - 1)]
     return []
 
+def estimate_contour_angle(contour):
+    data = np.array(contour)
+    data = data - np.mean(data, axis=0)
+    cov = np.cov(data.T)
+    eigvals, eigvecs = np.linalg.eig(cov)
+    major_axis = eigvecs[:, np.argmax(eigvals)]
+    angle_rad = np.arctan2(major_axis[1], major_axis[0])
+    angle_deg = np.degrees(angle_rad)
+    return angle_deg
+
 def load_contours(json_path):
     with open(json_path, "r") as f:
         data = json.load(f)
     return data
 
-def generate_stitch_paths(contours_data, spacing=2.0, width=None, outline_step=2.0, angle_deg=0,
+def generate_stitch_paths(contours_data, spacing=2.0, width=None, outline_step=2.0,
                            use_satin=True, use_zigzag=True, use_outline=True):
     stitch_paths = []
 
@@ -44,7 +55,8 @@ def generate_stitch_paths(contours_data, spacing=2.0, width=None, outline_step=2
             filled = False
             if use_satin:
                 try:
-                    fill_lines = generate_satin_fill(contour, spacing=spacing, width=width, angle_deg=angle_deg)
+                    angle = estimate_contour_angle(contour)
+                    fill_lines = generate_satin_fill(contour, spacing=spacing, width=width, angle_deg=angle)
                     for x0, y0, x1, y1 in fill_lines:
                         stitch_paths.append((color, [(x0, y0), (x1, y1)]))
                     filled = True
@@ -75,15 +87,14 @@ def visualize_stitch_paths(stitch_paths, canvas_size=(128, 128)):
         hex_color = "#{:02x}{:02x}{:02x}".format(*color)
         plt.plot(x, y, '-', color=hex_color, linewidth=1)
 
-    plt.title("Custom Fill: Satin / Zig-Zag / Outline")
+    plt.title("Dynamic Satin Angle Fill")
     plt.show()
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("file", help="Path to contours JSON")
     parser.add_argument("--spacing", type=float, default=2.0, help="Spacing between fill lines")
-    parser.add_argument("--width", type=float, default=None, help="Half-width of satin sweep")
-    parser.add_argument("--angle", type=float, default=0.0, help="Satin stitch angle in degrees")
+    parser.add_argument("--width", type=float, help="Half-width of satin sweep (auto if omitted)")
     parser.add_argument("--no-satin", action="store_true", help="Disable satin fill")
     parser.add_argument("--no-zigzag", action="store_true", help="Disable zig-zag fallback")
     parser.add_argument("--no-outline", action="store_true", help="Disable outline stitching")
@@ -95,7 +106,6 @@ def main():
         spacing=args.spacing,
         width=args.width,
         outline_step=args.spacing,
-        angle_deg=args.angle,
         use_satin=not args.no_satin,
         use_zigzag=not args.no_zigzag,
         use_outline=not args.no_outline
